@@ -1,0 +1,40 @@
+name: oracle_unbound_app
+description: A standalone sigil engine application.
+
+publish_to: 'none' # Remove this line if you want to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0' # Adjust if your Flutter SDK is different
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  video_player: ^2.7.0 # For video background
+  path_provider: ^2.1.1 # For finding paths to save files
+  image_gallery_saver: ^2.0.3 # To save images to gallery
+  permission_handler: ^11.0.1 # To request permissions
+  screenshot: ^2.1.0 # An alternative for capturing widget as image, can be simpler. Or use RepaintBoundary.
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  flutter_launcher_icons: ^0.13.1 # Or the latest version
+
+flutter_icons:
+  android: true # Or "launcher_icon"
+  ios: true
+  image_path: "assets/images/icon.png" # Path to YOUR master icon image
+  # Optional: if you want to generate adaptive icons for Android (recommended)
+  adaptive_icon_background: "#FFFFFF" # Or path to an image asset
+  adaptive_icon_foreground: "assets/images/icon_foreground.png" # Path to your foreground image
+  # remove_alpha_ios: true # If your icon has transparency and you want iOS to handle it
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/videos/

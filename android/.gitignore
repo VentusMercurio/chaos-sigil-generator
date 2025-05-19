@@ -1,0 +1,38 @@
+# General
+.DS_Store
+.idea/
+.vscode/
+build/
+dist/
+*.iml
+*.ipr
+*.iws
+*.lock
+*.pid
+*.seed
+*.log
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/ios/.symlinks/
+/ios/Flutter/App.framework
+/ios/Flutter/Flutter.framework
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/flutter_export_environment.sh
+/ios/Runner/GeneratedPluginRegistrant.*
+/android/app/build/
+/android/.gradle/
+/android/gradle/wrapper/gradle-wrapper.jar
+/android/key.properties
+# If you're not committing your keystore (recommended for public repos)
+# /android/app/*.jks
+# /android/app/*.keystore
+
+# Windows
+AppPackages/
+BundleArtifacts/
