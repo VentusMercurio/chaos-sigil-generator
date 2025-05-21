@@ -1,5 +1,5 @@
 // lib/screens/sigil_generator_screen.dart
-// Full Flutter Sigil Generator – Retooled for Conditional Export Background
+// Full Flutter Sigil Generator – Retooled with Back to Splash, Audio & Conditional Export Background
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:typed_data'; // For Uint8List
@@ -9,6 +9,10 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:audioplayers/audioplayers.dart'; // <<<<<<< ADDED for music
+
+// Import SplashScreen to navigate back to it
+import 'package:oracle_unbound_app/screens/splash_screen.dart';
 
 import '../widgets/video_background_scaffold.dart'; // Ensure this path is correct
 
@@ -19,8 +23,9 @@ class SigilGeneratorScreen extends StatefulWidget {
   State<SigilGeneratorScreen> createState() => _SigilGeneratorScreenState();
 }
 
+// <<<<<<< ADDED WidgetsBindingObserver for app lifecycle
 class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final TextEditingController _controller = TextEditingController();
   late AnimationController _pathAnimationController;
   late Animation<double> _pathAnimation;
@@ -41,11 +46,16 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
 
   final GlobalKey _sigilBoundaryKey = GlobalKey();
   bool _isExporting = false;
-  // NEW: State variable to trigger background drawing ONLY during export
   bool _drawBackgroundForExport = false;
+
+  // --- AUDIO PLAYER ---
+  final AudioPlayer _audioPlayer =
+      AudioPlayer(); // <<<<<<< ADDED audio player instance
+  bool _isMusicPlaying = false; // <<<<<<< ADDED to track music state
 
   static const int _pathAnimationDurationMs = 5200;
   static const int _circleAnimationDurationMs = 1200;
+  // ... (other static const durations remain the same)
   static const int _flyingLettersDurationMs = 1600;
   static const int _flyingLettersStaggerMs = 100;
   static const int _pauseAfterFlyingLettersMs = 200;
@@ -57,6 +67,9 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance
+        .addObserver(this); // <<<<<<< ADDED observer for lifecycle
+
     _pathAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: _pathAnimationDurationMs),
@@ -79,10 +92,16 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
       CurvedAnimation(
           parent: _circleAnimationController, curve: Curves.easeOutQuint),
     )..addListener(() => setState(() {}));
+
+    _playAmbientMusic(); // <<<<<<< ADDED call to play music
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // <<<<<<< REMOVED observer
+    _stopAmbientMusic(); // <<<<<<< ADDED call to stop music
+    _audioPlayer.dispose(); // <<<<<<< DISPOSE audio player
+
     _controller.dispose();
     _pathAnimationController.dispose();
     _circleAnimationController.dispose();
@@ -90,6 +109,68 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
     super.dispose();
   }
 
+  // --- APP LIFECYCLE CHANGES FOR MUSIC ---
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // <<<<<<< ADDED LIFECYCLE METHOD
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      if (_isMusicPlaying) {
+        _audioPlayer.pause();
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      // Only resume if it was playing before and the screen is still active
+      // And we intend for music to be playing on this screen.
+      if (_isMusicPlaying && mounted) {
+        _audioPlayer.resume();
+      }
+    }
+  }
+
+  // --- MUSIC CONTROL METHODS ---
+  Future<void> _playAmbientMusic() async {
+    // <<<<<<< ADDED METHOD
+    try {
+      // Ensure you have 'background.mp3' (or your chosen file) in 'assets/audio/'
+      // and declared in pubspec.yaml
+      await _audioPlayer.setSource(AssetSource('audio/background.mp3'));
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.resume();
+      if (mounted) {
+        setState(() {
+          _isMusicPlaying = true;
+        });
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print("Error playing music: $e");
+      if (mounted) {
+        setState(() {
+          _isMusicPlaying = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _stopAmbientMusic() async {
+    // <<<<<<< ADDED METHOD
+    try {
+      await _audioPlayer.stop();
+      if (mounted) {
+        setState(() {
+          _isMusicPlaying = false;
+        });
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print("Error stopping music: $e");
+    }
+  }
+  // --- END MUSIC CONTROL METHODS ---
+
+  // ... (_resetSigilState, _generateSigil, _generateCirclePoints, _generateSigilPath, _exportSigil methods remain IDENTICAL to your last provided block)
   void _resetSigilState() {
     _pathAnimationController.reset();
     _circleAnimationController.reset();
@@ -103,7 +184,7 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
       _showIntentionBar = true;
       _intentionBarOpacity = 1.0;
       _sigilAnimationsComplete = false;
-      _drawBackgroundForExport = false; // Ensure this is reset
+      _drawBackgroundForExport = false;
     });
   }
 
@@ -127,8 +208,7 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
       _reduced = '';
       _showReducedText = true;
       _sigilAnimationsComplete = false;
-      _drawBackgroundForExport =
-          false; // Ensure this is false during generation
+      _drawBackgroundForExport = false;
     });
 
     final rawInput = _input;
@@ -138,7 +218,6 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
         noVowels.split('').where((char) => seen.add(char)).join();
     if (mounted) setState(() => _reduced = reducedString);
 
-    // Flying letters logic (copied from your working version)
     final List<String> simpleFlyingChars = [];
     Set<String> tempKeptChars = reducedString.split('').toSet();
     for (final char in rawInput.replaceAll(' ', '').split('')) {
@@ -215,7 +294,6 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   }
 
   List<Offset> _generateCirclePoints(String input, double radius) {
-    // ... (copied from your working version)
     final length = input.length;
     if (length == 0) return [];
     final angleStep = 2 * pi / length;
@@ -228,7 +306,6 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   }
 
   Path _generateSigilPath(String input, List<Offset> points) {
-    // ... (copied from your working version)
     if (points.length < 2) return Path();
     final random = Random(input.hashCode);
     final pathOrder = <int>[];
@@ -273,29 +350,23 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
 
     setState(() {
       _isExporting = true;
-      _drawBackgroundForExport = true; // <<<<<<< TRIGGER BACKGROUND FOR EXPORT
+      _drawBackgroundForExport = true;
     });
+    await Future.delayed(const Duration(milliseconds: 50));
 
-    // Crucial: Allow the UI to rebuild with _drawBackgroundForExport = true
-    // BEFORE capturing the RepaintBoundary.
-    await Future.delayed(const Duration(milliseconds: 50)); // Small delay
-
-    // Simplified permission logic (closer to your working version)
     var storageStatus = await Permission.storage.status;
-    var photosStatus = await Permission
-        .photos.status; // For iOS, this often covers "add to gallery"
+    var photosStatus = await Permission.photos.status;
 
     bool permissionGranted = false;
     if (await Permission.photos.request().isGranted ||
         await Permission.storage.request().isGranted) {
       permissionGranted = true;
     }
-    // Fallback for older permission_handler versions or specific platforms if the above is too simple
     if (!permissionGranted) {
       if (photosStatus.isDenied)
         photosStatus = await Permission.photos.request();
       if (storageStatus.isDenied)
-        storageStatus = await Permission.storage.request(); // For Android
+        storageStatus = await Permission.storage.request();
       permissionGranted = photosStatus.isGranted || storageStatus.isGranted;
     }
 
@@ -344,8 +415,7 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
     if (mounted) {
       setState(() {
         _isExporting = false;
-        _drawBackgroundForExport =
-            false; // <<<<<<< RESET BACKGROUND AFTER EXPORT
+        _drawBackgroundForExport = false;
       });
     }
   }
@@ -353,30 +423,37 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   @override
   Widget build(BuildContext context) {
     return VideoBackgroundScaffold(
-      videoAssetPath: 'assets/videos/sparks.mp4', // Ensure this path is correct
+      videoAssetPath: 'assets/videos/sparks.mp4',
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          // Add leading BackButton if needed and not automatically added by Navigator
-          leading: Navigator.canPop(context)
-              ? const BackButton(color: Colors.redAccent)
-              : null,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new, color: Colors.redAccent[100]),
+            tooltip: 'Back to Home', // Updated tooltip
+            onPressed: () {
+              // Navigate to SplashScreen and remove all routes above it.
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const SplashScreen()),
+                (Route<dynamic> route) =>
+                    false, // This predicate removes all routes.
+              );
+            },
+          ),
           backgroundColor: Colors.transparent,
           elevation: 0,
           title: const Text('Sigil Generator',
               style: TextStyle(
                   color: Colors.redAccent, fontWeight: FontWeight.w600)),
           centerTitle: true,
-          // iconTheme for other AppBar icons, if any
         ),
         body: Stack(
+          // ... (The rest of the body Stack and its children remain IDENTICAL to your last provided block)
           alignment: Alignment.center,
           children: [
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  // ... (Intention Bar, Conjure Button, Glyphs Text - copied from your working version)
                   AnimatedOpacity(
                     opacity: _intentionBarOpacity,
                     duration: const Duration(milliseconds: _intentionBarFadeMs),
@@ -476,15 +553,12 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
                           progress: _pathAnimation.value,
                           circlePoints: _circlePoints,
                           circleProgress: _circleAnimation.value,
-                          // PASS THE NEW FLAG
                           drawBackgroundOnExport: _drawBackgroundForExport,
                         ),
-                        child: const SizedBox
-                            .expand(), // Use SizedBox.expand for CustomPaint child
+                        child: const SizedBox.expand(),
                       ),
                     ),
                   ),
-                  // ... (Export and New Sigil buttons - visibility logic from your working version)
                   if (_sigilAnimationsComplete &&
                       !_showIntentionBar &&
                       _sigilPath.computeMetrics().isNotEmpty)
@@ -540,7 +614,7 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   }
 }
 
-// --- FlyingLetterWidget (Copied from your working version - no changes) ---
+// --- FlyingLetterWidget (NO CHANGES) ---
 class FlyingLetterWidget extends StatefulWidget {
   final String char;
   final Offset start;
@@ -639,27 +713,26 @@ class _FlyingLetterWidgetState extends State<FlyingLetterWidget>
   }
 }
 
-// --- AnimatedSigilPainter (MODIFIED) ---
+// --- AnimatedSigilPainter (NO CHANGES) ---
 class AnimatedSigilPainter extends CustomPainter {
   final Path fullPath;
   final double progress;
   final List<Offset> circlePoints;
   final double circleProgress;
-  final bool drawBackgroundOnExport; // <<<<<<< NEW PARAMETER
+  final bool drawBackgroundOnExport;
 
   AnimatedSigilPainter({
     required this.fullPath,
     required this.progress,
     required this.circlePoints,
     required this.circleProgress,
-    required this.drawBackgroundOnExport, // <<<<<<< NEW PARAMETER
+    required this.drawBackgroundOnExport,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty || size.width <= 0 || size.height <= 0) return;
 
-    // <<<<<<< CONDITIONALLY DRAW BACKGROUND
     if (drawBackgroundOnExport) {
       final backgroundPaint = Paint()..color = Colors.black;
       canvas.drawRect(Offset.zero & size, backgroundPaint);
@@ -667,7 +740,6 @@ class AnimatedSigilPainter extends CustomPainter {
 
     final Offset center = Offset(size.width / 2, size.height / 2);
 
-    // ... (Rest of the sigil painting logic - copied from your working version)
     final pointPaint = Paint()
       ..color = Colors.redAccent.withOpacity(0.8)
       ..style = PaintingStyle.fill;
@@ -716,14 +788,12 @@ class AnimatedSigilPainter extends CustomPainter {
   bool shouldRepaint(covariant AnimatedSigilPainter oldDelegate) =>
       oldDelegate.progress != progress ||
       oldDelegate.circleProgress != circleProgress ||
-      !listEquals(
-          oldDelegate.circlePoints, circlePoints) || // Use your listEquals
+      !listEquals(oldDelegate.circlePoints, circlePoints) ||
       oldDelegate.fullPath != fullPath ||
-      oldDelegate.drawBackgroundOnExport !=
-          drawBackgroundOnExport; // <<<<<<< ADDED
+      oldDelegate.drawBackgroundOnExport != drawBackgroundOnExport;
 }
 
-// --- listEquals Helper (Copied from your working version - no changes) ---
+// --- listEquals Helper (NO CHANGES) ---
 bool listEquals<T>(List<T>? a, List<T>? b) {
   if (a == null) return b == null;
   if (b == null || a.length != b.length) return false;
@@ -734,7 +804,7 @@ bool listEquals<T>(List<T>? a, List<T>? b) {
   return true;
 }
 
-// Placeholder for openAppSettings (Copied from your working version)
+// --- openAppSettings Placeholder (NO CHANGES) ---
 Future<void> openAppSettings() async {
   // ignore: avoid_print
   print("Attempting to open app settings. Implement with a plugin if needed.");
