@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:oracle_unbound_app/screens/sigil_generator_screen.dart';
 import 'package:oracle_unbound_app/widgets/video_background_scaffold.dart'; // Import VideoBackgroundScaffold
+import 'package:oracle_unbound_app/screens/about_screen.dart'; // <<<<<<< ADD IMPORT FOR ABOUT SCREEN
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,48 +13,51 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   void _proceedToApp() {
-    Navigator.of(context).push(
+    Navigator.of(context).pushReplacement(
+      // Use pushReplacement to prevent going back to splash
       MaterialPageRoute(
         builder: (BuildContext context) => const SigilGeneratorScreen(),
       ),
     );
   }
 
+  void _navigateToAboutScreen() {
+    // <<<<<<< NEW NAVIGATION METHOD
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (BuildContext context) => const AboutScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Choose a video for your splash screen.
-    // You might want a different, perhaps more subtle video than the main app.
-    // For this example, I'll use the same 'red_nebula.mp4'.
-    // Make sure this asset exists in 'assets/videos/'.
     const String splashVideoAsset = 'assets/videos/red_nebula.mp4';
 
     return VideoBackgroundScaffold(
       videoAssetPath: splashVideoAsset,
       child: Scaffold(
-        backgroundColor:
-            Colors.transparent, // Important for video background to show
+        backgroundColor: Colors.transparent,
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              // <-- WRAP WITH SingleChildScrollView
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const SizedBox(
-                        height:
-                            20), // Add some top padding if needed when scrollable
-                    Image.asset(
-                      'assets/images/icon.png',
-                      width: 100,
-                      height: 100,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const FlutterLogo(size: 80);
-                      },
-                    ),
                     const SizedBox(height: 20),
+                    // --- ICON REMOVED ---
+                    // Image.asset(
+                    //   'assets/images/icon.png',
+                    //   width: 100,
+                    //   height: 100,
+                    //   errorBuilder: (context, error, stackTrace) {
+                    //     return const FlutterLogo(size: 80);
+                    //   },
+                    // ),
+                    // const SizedBox(height: 20), // Space after icon, also removed or adjusted
                     const Text(
                       'Chaos Sigil Generator',
                       textAlign: TextAlign.center,
@@ -74,8 +78,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     Container(
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(
-                            0.75), // Slightly more opaque background for readability
+                        color: Colors.black.withOpacity(0.75),
                         borderRadius: BorderRadius.circular(12.0),
                         border: Border.all(
                             color: Colors.redAccent.withOpacity(0.5)),
@@ -104,8 +107,7 @@ class _SplashScreenState extends State<SplashScreen> {
                             'Sigil magick is unpredictable and may affect your reality. Results depend on your focus, intent, and belief. We are not responsible for any outcomes that arise from its use.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(
-                                  0.9), // Increased opacity for readability
+                              color: Colors.white.withOpacity(0.9),
                               fontSize: 15,
                               height: 1.4,
                             ),
@@ -116,8 +118,7 @@ class _SplashScreenState extends State<SplashScreen> {
                               'Proceed with awareness.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Colors.redAccent
-                                    .withOpacity(0.95), // Increased opacity
+                                color: Colors.redAccent.withOpacity(0.95),
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -135,27 +136,35 @@ class _SplashScreenState extends State<SplashScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 40, vertical: 15),
                         textStyle: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                            fontSize: 18, fontWeight: FontWeight.bold),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                         elevation: 5,
                         shadowColor: Colors.redAccent.withOpacity(0.5),
                       ),
                       child: const Text('Acknowledge & Proceed'),
                     ),
-                    const SizedBox(height: 30), // Space before version
-                    Text(
-                      "Version 1.0.0",
-                      style: TextStyle(
-                          color: Colors.grey[500],
-                          fontSize:
-                              12), // Lighter grey for better visibility on video
-                    ),
                     const SizedBox(
-                        height: 20), // Add some bottom padding if needed
+                        height: 20), // <<<<<<< SPACE BEFORE ABOUT BUTTON
+                    TextButton(
+                      // <<<<<<< ADDED ABOUT/FAQ BUTTON
+                      onPressed: _navigateToAboutScreen,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey[400],
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 10),
+                      ),
+                      child: const Text(
+                        'About Chaos Magick & FAQ',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 20), // Space before version
+                    Text(
+                      "Version 1.0.1", // Consider updating version number
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
