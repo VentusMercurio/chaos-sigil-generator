@@ -14,6 +14,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   video_player: ^2.7.0 # For video background
   path_provider: ^2.1.1 # For finding paths to save files
+  audioplayers: ^6.4.0
   image_gallery_saver: ^2.0.3 # To save images to gallery
   permission_handler: ^11.0.1 # To request permissions
   screenshot: ^2.1.0 # An alternative for capturing widget as image, can be simpler. Or use RepaintBoundary.
@@ -38,3 +39,4 @@ flutter:
   assets:
     - assets/images/
     - assets/videos/
+    - assets/audio/

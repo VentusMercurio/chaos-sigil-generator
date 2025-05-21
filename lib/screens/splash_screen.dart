@@ -12,7 +12,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   void _proceedToApp() {
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).push(
       MaterialPageRoute(
         builder: (BuildContext context) => const SigilGeneratorScreen(),
       ),
@@ -46,7 +46,7 @@ class _SplashScreenState extends State<SplashScreen> {
                         height:
                             20), // Add some top padding if needed when scrollable
                     Image.asset(
-                      'assets/images/splash_logo.png',
+                      'assets/images/icon.png',
                       width: 100,
                       height: 100,
                       errorBuilder: (context, error, stackTrace) {

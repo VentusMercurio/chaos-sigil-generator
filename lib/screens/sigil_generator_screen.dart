@@ -1,17 +1,16 @@
 // lib/screens/sigil_generator_screen.dart
-// Full Flutter Sigil Generator – v1.0.5-Ordo.Sigilorum.Exportable
+// Full Flutter Sigil Generator – Retooled for Conditional Export Background
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:typed_data'; // For Uint8List
 import 'dart:ui' as ui; // For ui.Image
-import 'package:flutter/rendering.dart'; // <--- *** THE FIX IS HERE ***
+import 'package:flutter/rendering.dart';
 
-import 'package:path_provider/path_provider.dart'; // For local path, though not strictly needed with image_gallery_saver
+import 'package:path_provider/path_provider.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
-// import 'package:screenshot/screenshot.dart'; // Alternative way using screenshot package
 
-import '../widgets/video_background_scaffold.dart';
+import '../widgets/video_background_scaffold.dart'; // Ensure this path is correct
 
 class SigilGeneratorScreen extends StatefulWidget {
   const SigilGeneratorScreen({super.key});
@@ -38,12 +37,12 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
 
   bool _showIntentionBar = true;
   double _intentionBarOpacity = 1.0;
+  bool _sigilAnimationsComplete = false;
 
-  // Key for RepaintBoundary to capture the sigil drawing area
   final GlobalKey _sigilBoundaryKey = GlobalKey();
-  // ScreenshotController screenshotController = ScreenshotController(); // For screenshot package
-
-  bool _isExporting = false; // To show loading indicator on button
+  bool _isExporting = false;
+  // NEW: State variable to trigger background drawing ONLY during export
+  bool _drawBackgroundForExport = false;
 
   static const int _pathAnimationDurationMs = 5200;
   static const int _circleAnimationDurationMs = 1200;
@@ -58,36 +57,27 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   @override
   void initState() {
     super.initState();
-
     _pathAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: _pathAnimationDurationMs),
     );
-
     _circleAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: _circleAnimationDurationMs),
     );
-
     _flyingLetterMasterController = AnimationController(
       vsync: this,
       duration: Duration(
         milliseconds: _flyingLettersDurationMs + (_flyingLettersStaggerMs * 15),
       ),
     );
-
     _pathAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-        parent: _pathAnimationController,
-        curve: Curves.easeInOutSine,
-      ),
+          parent: _pathAnimationController, curve: Curves.easeInOutSine),
     )..addListener(() => setState(() {}));
-
     _circleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-        parent: _circleAnimationController,
-        curve: Curves.easeOutQuint,
-      ),
+          parent: _circleAnimationController, curve: Curves.easeOutQuint),
     )..addListener(() => setState(() {}));
   }
 
@@ -112,20 +102,21 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
       _flyingLetterWidgets = [];
       _showIntentionBar = true;
       _intentionBarOpacity = 1.0;
+      _sigilAnimationsComplete = false;
+      _drawBackgroundForExport = false; // Ensure this is reset
     });
   }
 
   void _generateSigil() async {
-    if (_controller.text.isEmpty && _showIntentionBar) {
-      return;
-    }
-
+    if (_controller.text.isEmpty && _showIntentionBar) return;
     if (!_showIntentionBar) {
       _resetSigilState();
       await Future.delayed(const Duration(milliseconds: 20));
       if (_controller.text.isEmpty) return;
     }
-
+    _pathAnimationController.reset();
+    _circleAnimationController.reset();
+    _flyingLetterMasterController.reset();
     setState(() {
       _input = _controller.text.toUpperCase();
       _showIntentionBar = false;
@@ -135,23 +126,19 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
       _flyingLetterWidgets = [];
       _reduced = '';
       _showReducedText = true;
+      _sigilAnimationsComplete = false;
+      _drawBackgroundForExport =
+          false; // Ensure this is false during generation
     });
-    _pathAnimationController.reset();
-    _circleAnimationController.reset();
-    _flyingLetterMasterController.reset();
 
     final rawInput = _input;
     final noVowels = rawInput.replaceAll(RegExp(r'[AEIOU\s]'), '');
     final seen = <String>{};
     final reducedString =
         noVowels.split('').where((char) => seen.add(char)).join();
+    if (mounted) setState(() => _reduced = reducedString);
 
-    if (mounted) {
-      setState(() {
-        _reduced = reducedString;
-      });
-    }
-
+    // Flying letters logic (copied from your working version)
     final List<String> simpleFlyingChars = [];
     Set<String> tempKeptChars = reducedString.split('').toSet();
     for (final char in rawInput.replaceAll(' ', '').split('')) {
@@ -161,18 +148,14 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
         tempKeptChars.remove(char);
       }
     }
-
     final size = MediaQuery.of(context).size;
     final screenCenterForFlyingLetters = Offset(
       size.width / 2,
       size.height / 2 - (AppBar().preferredSize.height / 2),
     );
-
     _flyingLetterMasterController.forward(from: 0.0);
     await Future.delayed(
-      const Duration(milliseconds: _intentionBarFadeMs ~/ 3),
-    );
-
+        const Duration(milliseconds: _intentionBarFadeMs ~/ 3));
     for (int i = 0; i < simpleFlyingChars.length; i++) {
       final char = simpleFlyingChars[i];
       Future.delayed(Duration(milliseconds: i * _flyingLettersStaggerMs), () {
@@ -184,45 +167,31 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
           screenCenterForFlyingLetters.dx + distance * cos(angle),
           screenCenterForFlyingLetters.dy + distance * sin(angle),
         );
-        setState(
-          () => _flyingLetterWidgets.add(
-            FlyingLetterWidget(
+        setState(() => _flyingLetterWidgets.add(FlyingLetterWidget(
               key: UniqueKey(),
               char: char,
               start: screenCenterForFlyingLetters,
               end: target,
               duration: const Duration(milliseconds: _flyingLettersDurationMs),
-            ),
-          ),
-        );
+            )));
       });
     }
-
-    await Future.delayed(
-      Duration(
+    await Future.delayed(Duration(
         milliseconds: _flyingLettersDurationMs +
             (simpleFlyingChars.length * _flyingLettersStaggerMs ~/ 2) +
-            _pauseAfterFlyingLettersMs,
-      ),
-    );
-
+            _pauseAfterFlyingLettersMs));
     Future.delayed(
-      Duration(
-        milliseconds: _flyingLettersDurationMs +
-            (simpleFlyingChars.length * _flyingLettersStaggerMs) +
-            500,
-      ),
-      () {
-        if (mounted) setState(() => _flyingLetterWidgets = []);
-      },
-    );
+        Duration(
+            milliseconds: _flyingLettersDurationMs +
+                (simpleFlyingChars.length * _flyingLettersStaggerMs) +
+                500), () {
+      if (mounted) setState(() => _flyingLetterWidgets = []);
+    });
 
     if (reducedString.isEmpty) {
       Future.delayed(const Duration(milliseconds: 800), () {
         if (mounted) {
-          setState(() {
-            _showReducedText = false;
-          });
+          setState(() => _showReducedText = false);
           _resetSigilState();
         }
       });
@@ -232,27 +201,21 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
     const double sigilPointsRadius = 85.0;
     _circlePoints = _generateCirclePoints(reducedString, sigilPointsRadius);
     _sigilPath = _generateSigilPath(reducedString, _circlePoints);
-
     _pathAnimationController.forward(from: 0.0);
-
     Future.delayed(const Duration(milliseconds: _glyphsTextFadeOutDelayMs), () {
-      if (mounted) {
-        setState(() {
-          _showReducedText = false;
-        });
-      }
+      if (mounted) setState(() => _showReducedText = false);
     });
-
-    await Future.delayed(
-      const Duration(
-        milliseconds: _pathAnimationDurationMs + _pauseBeforeCircleMs,
-      ),
-    );
+    await Future.delayed(const Duration(
+        milliseconds: _pathAnimationDurationMs + _pauseBeforeCircleMs));
     if (!mounted) return;
     _circleAnimationController.forward(from: 0.0);
+    await Future.delayed(
+        const Duration(milliseconds: _circleAnimationDurationMs + 200));
+    if (mounted) setState(() => _sigilAnimationsComplete = true);
   }
 
   List<Offset> _generateCirclePoints(String input, double radius) {
+    // ... (copied from your working version)
     final length = input.length;
     if (length == 0) return [];
     final angleStep = 2 * pi / length;
@@ -265,12 +228,12 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   }
 
   Path _generateSigilPath(String input, List<Offset> points) {
+    // ... (copied from your working version)
     if (points.length < 2) return Path();
     final random = Random(input.hashCode);
     final pathOrder = <int>[];
     final Set<int> visitedIndices = {};
     int currentIndex = random.nextInt(points.length);
-
     while (visitedIndices.length < points.length) {
       pathOrder.add(currentIndex);
       visitedIndices.add(currentIndex);
@@ -300,61 +263,67 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   }
 
   Future<void> _exportSigil() async {
-    // Prevent export if no sigil is visible or already exporting
-    if (_sigilPath.computeMetrics().isEmpty || _isExporting) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('No sigil to export or already exporting.')),
-      );
+    if (!_sigilAnimationsComplete ||
+        _sigilPath.computeMetrics().isEmpty ||
+        _isExporting) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please wait for sigil animation to complete.')));
       return;
     }
 
     setState(() {
       _isExporting = true;
+      _drawBackgroundForExport = true; // <<<<<<< TRIGGER BACKGROUND FOR EXPORT
     });
 
-    // 1. Request Permissions
-    var status = await Permission.storage.status; // For older Android versions
-    var photosStatus = await Permission.photos.status; // For newer Android/iOS
+    // Crucial: Allow the UI to rebuild with _drawBackgroundForExport = true
+    // BEFORE capturing the RepaintBoundary.
+    await Future.delayed(const Duration(milliseconds: 50)); // Small delay
 
-    if (status.isDenied || status.isPermanentlyDenied) {
-      status = await Permission.storage.request();
+    // Simplified permission logic (closer to your working version)
+    var storageStatus = await Permission.storage.status;
+    var photosStatus = await Permission
+        .photos.status; // For iOS, this often covers "add to gallery"
+
+    bool permissionGranted = false;
+    if (await Permission.photos.request().isGranted ||
+        await Permission.storage.request().isGranted) {
+      permissionGranted = true;
     }
-    if (photosStatus.isDenied || photosStatus.isPermanentlyDenied) {
-      photosStatus = await Permission.photos.request();
+    // Fallback for older permission_handler versions or specific platforms if the above is too simple
+    if (!permissionGranted) {
+      if (photosStatus.isDenied)
+        photosStatus = await Permission.photos.request();
+      if (storageStatus.isDenied)
+        storageStatus = await Permission.storage.request(); // For Android
+      permissionGranted = photosStatus.isGranted || storageStatus.isGranted;
     }
 
-    if (status.isGranted || photosStatus.isGranted) {
-      // Check if either is granted
+    if (permissionGranted) {
       try {
-        // 2. Capture the RepaintBoundary
         RenderRepaintBoundary boundary = _sigilBoundaryKey.currentContext!
             .findRenderObject() as RenderRepaintBoundary;
-        // Increase pixelRatio for higher resolution. Default is 1.0 or devicePixelRatio.
-        // For wallpapers, a higher ratio like 3.0 or 4.0 might be good.
         ui.Image image = await boundary.toImage(pixelRatio: 3.0);
         ByteData? byteData =
             await image.toByteData(format: ui.ImageByteFormat.png);
-        Uint8List pngBytes = byteData!.buffer.asUint8List();
+        if (byteData == null) throw Exception("ByteData is null");
+        Uint8List pngBytes = byteData.buffer.asUint8List();
 
-        // 3. Save the image
         final result = await ImageGallerySaver.saveImage(
           pngBytes,
-          quality: 100, // For PNG, quality is often ignored but good to have
+          quality: 100,
           name: "sigil_${DateTime.now().millisecondsSinceEpoch}",
         );
 
         if (mounted) {
           if (result['isSuccess']) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(
-                      'Sigil saved to Gallery: ${result['filePath'] ?? ''}')),
-            );
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(
+                    'Sigil saved to Gallery: ${result['filePath'] ?? ''}')));
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to save sigil.')),
-            );
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(
+                    'Failed to save sigil: ${result['errorMessage'] ?? 'Unknown error'}')));
           }
         }
       } catch (e) {
@@ -362,26 +331,21 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
         print("Error exporting sigil: $e");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error exporting sigil: $e')),
-          );
+              SnackBar(content: Text('Error exporting sigil: $e')));
         }
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content:
-                  Text('Storage/Photos permission denied. Cannot save sigil.')),
-        );
-        // Optionally, open app settings if permission is permanently denied
-        if (status.isPermanentlyDenied || photosStatus.isPermanentlyDenied) {
-          openAppSettings();
-        }
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Gallery permission denied. Cannot save sigil.')));
       }
     }
+
     if (mounted) {
       setState(() {
         _isExporting = false;
+        _drawBackgroundForExport =
+            false; // <<<<<<< RESET BACKGROUND AFTER EXPORT
       });
     }
   }
@@ -389,21 +353,21 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   @override
   Widget build(BuildContext context) {
     return VideoBackgroundScaffold(
-      videoAssetPath: 'assets/videos/red_nebula.mp4',
+      videoAssetPath: 'assets/videos/sparks.mp4', // Ensure this path is correct
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
+          // Add leading BackButton if needed and not automatically added by Navigator
+          leading: Navigator.canPop(context)
+              ? const BackButton(color: Colors.redAccent)
+              : null,
           backgroundColor: Colors.transparent,
           elevation: 0,
-          title: const Text(
-            'Sigil Generator',
-            style: TextStyle(
-              color: Colors.redAccent,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          title: const Text('Sigil Generator',
+              style: TextStyle(
+                  color: Colors.redAccent, fontWeight: FontWeight.w600)),
           centerTitle: true,
-          iconTheme: const IconThemeData(color: Colors.redAccent),
+          // iconTheme for other AppBar icons, if any
         ),
         body: Stack(
           alignment: Alignment.center,
@@ -412,6 +376,7 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
+                  // ... (Intention Bar, Conjure Button, Glyphs Text - copied from your working version)
                   AnimatedOpacity(
                     opacity: _intentionBarOpacity,
                     duration: const Duration(milliseconds: _intentionBarFadeMs),
@@ -424,29 +389,22 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
                             controller: _controller,
                             enabled: _showIntentionBar,
                             style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
+                                color: Colors.white, fontSize: 16),
                             decoration: InputDecoration(
                               hintText: 'Enter your intention...',
                               hintStyle: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
-                              ),
+                                  color: Colors.white.withOpacity(0.6)),
                               filled: true,
                               fillColor: Colors.black.withOpacity(0.6),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.redAccent.withOpacity(0.5),
-                                ),
-                              ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                      color:
+                                          Colors.redAccent.withOpacity(0.5))),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Colors.redAccent,
-                                  width: 1.5,
-                                ),
-                              ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                      color: Colors.redAccent, width: 1.5)),
                             ),
                             onSubmitted: (_) => _generateSigil(),
                           ),
@@ -459,16 +417,11 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
                                   Colors.redAccent.withOpacity(0.85),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 30,
-                                vertical: 15,
-                              ),
+                                  horizontal: 30, vertical: 15),
                               textStyle: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  fontSize: 16, fontWeight: FontWeight.bold),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                             child: const Text('Conjure Sigil'),
                           ),
@@ -496,7 +449,7 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
                       child: Text(
                         _reduced.isNotEmpty
                             ? 'Glyphs: $_reduced'
-                            : (_input.isNotEmpty && _showIntentionBar == false
+                            : (_input.isNotEmpty && !_showIntentionBar
                                 ? 'Processing...'
                                 : ''),
                         style: TextStyle(
@@ -505,10 +458,9 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
                           letterSpacing: 2,
                           shadows: const [
                             Shadow(
-                              blurRadius: 4,
-                              color: Colors.black54,
-                              offset: Offset(1, 1),
-                            ),
+                                blurRadius: 4,
+                                color: Colors.black54,
+                                offset: Offset(1, 1))
                           ],
                         ),
                         textAlign: TextAlign.center,
@@ -516,7 +468,6 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
                     ),
                   ),
                   Expanded(
-                    // This RepaintBoundary will capture the CustomPaint area
                     child: RepaintBoundary(
                       key: _sigilBoundaryKey,
                       child: CustomPaint(
@@ -525,12 +476,17 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
                           progress: _pathAnimation.value,
                           circlePoints: _circlePoints,
                           circleProgress: _circleAnimation.value,
+                          // PASS THE NEW FLAG
+                          drawBackgroundOnExport: _drawBackgroundForExport,
                         ),
-                        child: Container(), // Ensures CustomPaint takes space
+                        child: const SizedBox
+                            .expand(), // Use SizedBox.expand for CustomPaint child
                       ),
                     ),
                   ),
-                  if (!_showIntentionBar &&
+                  // ... (Export and New Sigil buttons - visibility logic from your working version)
+                  if (_sigilAnimationsComplete &&
+                      !_showIntentionBar &&
                       _sigilPath.computeMetrics().isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 16.0),
@@ -540,10 +496,7 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
+                                    strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.save_alt),
                         label: Text(_isExporting
                             ? 'Exporting...'
@@ -558,23 +511,24 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
                           textStyle: const TextStyle(
                               fontSize: 15, fontWeight: FontWeight.bold),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                              borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
-                    ),
-                  if (!_showIntentionBar)
+                    )
+                  else if (!_showIntentionBar)
+                    const SizedBox(height: 56 + 16),
+                  if (_sigilAnimationsComplete && !_showIntentionBar)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8.0),
                       child: TextButton(
                         onPressed: _resetSigilState,
-                        child: const Text(
-                          'Create New Sigil',
-                          style:
-                              TextStyle(color: Colors.redAccent, fontSize: 16),
-                        ),
+                        child: const Text('Create New Sigil',
+                            style: TextStyle(
+                                color: Colors.redAccent, fontSize: 16)),
                       ),
-                    ),
+                    )
+                  else if (!_showIntentionBar)
+                    const SizedBox(height: 40 + 8),
                 ],
               ),
             ),
@@ -586,7 +540,7 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   }
 }
 
-// --- FlyingLetterWidget (No changes from your original) ---
+// --- FlyingLetterWidget (Copied from your working version - no changes) ---
 class FlyingLetterWidget extends StatefulWidget {
   final String char;
   final Offset start;
@@ -619,51 +573,31 @@ class _FlyingLetterWidgetState extends State<FlyingLetterWidget>
     super.initState();
     _controller = AnimationController(vsync: this, duration: widget.duration)
       ..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          widget.onComplete?.call();
-        }
+        if (status == AnimationStatus.completed) widget.onComplete?.call();
       });
-
-    _position = Tween<Offset>(
-      begin: widget.start,
-      end: widget.end,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
-
+    _position = Tween<Offset>(begin: widget.start, end: widget.end).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
     _opacity = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(
-          begin: 0.0,
-          end: 1.0,
-        ).chain(CurveTween(curve: Curves.easeIn)),
-        weight: 15,
-      ),
+          tween: Tween<double>(begin: 0.0, end: 1.0)
+              .chain(CurveTween(curve: Curves.easeIn)),
+          weight: 15),
       TweenSequenceItem(tween: ConstantTween<double>(1.0), weight: 60),
       TweenSequenceItem(
-        tween: Tween<double>(
-          begin: 1.0,
-          end: 0.0,
-        ).chain(CurveTween(curve: Curves.easeOut)),
-        weight: 25,
-      ),
+          tween: Tween<double>(begin: 1.0, end: 0.0)
+              .chain(CurveTween(curve: Curves.easeOut)),
+          weight: 25),
     ]).animate(_controller);
-
     _scale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(
-          begin: 0.5,
-          end: 1.2,
-        ).chain(CurveTween(curve: Curves.easeOutBack)),
-        weight: 30,
-      ),
+          tween: Tween<double>(begin: 0.5, end: 1.2)
+              .chain(CurveTween(curve: Curves.easeOutBack)),
+          weight: 30),
       TweenSequenceItem(
-        tween: Tween<double>(
-          begin: 1.2,
-          end: 1.0,
-        ).chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 70,
-      ),
+          tween: Tween<double>(begin: 1.2, end: 1.0)
+              .chain(CurveTween(curve: Curves.easeInOut)),
+          weight: 70),
     ]).animate(_controller);
-
     _controller.forward();
   }
 
@@ -679,73 +613,74 @@ class _FlyingLetterWidgetState extends State<FlyingLetterWidget>
       animation: _controller,
       builder: (context, child) {
         if (_opacity.value <= 0.01 &&
-            (_controller.isCompleted || _controller.isDismissed)) {
+            (_controller.isCompleted || _controller.isDismissed))
           return const SizedBox.shrink();
-        }
         return Positioned(
           left: _position.value.dx - (18 * _scale.value / 2),
           top: _position.value.dy - (18 * _scale.value / 2),
           child: Opacity(
-            opacity: _opacity.value,
-            child: Transform.scale(
-              scale: _scale.value,
-              child: Text(
-                widget.char,
-                style: const TextStyle(
-                  color: Colors.redAccent,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  shadows: [
-                    Shadow(
-                      blurRadius: 6,
-                      color: Colors.red,
-                      offset: Offset(0, 0),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+              opacity: _opacity.value,
+              child: Transform.scale(
+                  scale: _scale.value,
+                  child: Text(widget.char,
+                      style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          shadows: [
+                            Shadow(
+                                blurRadius: 6,
+                                color: Colors.red,
+                                offset: Offset(0, 0))
+                          ])))),
         );
       },
     );
   }
 }
 
-// --- AnimatedSigilPainter (No changes from your original) ---
+// --- AnimatedSigilPainter (MODIFIED) ---
 class AnimatedSigilPainter extends CustomPainter {
   final Path fullPath;
   final double progress;
   final List<Offset> circlePoints;
   final double circleProgress;
+  final bool drawBackgroundOnExport; // <<<<<<< NEW PARAMETER
 
   AnimatedSigilPainter({
     required this.fullPath,
     required this.progress,
     required this.circlePoints,
     required this.circleProgress,
+    required this.drawBackgroundOnExport, // <<<<<<< NEW PARAMETER
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.isEmpty || size.width <= 0 || size.height <= 0) return;
+
+    // <<<<<<< CONDITIONALLY DRAW BACKGROUND
+    if (drawBackgroundOnExport) {
+      final backgroundPaint = Paint()..color = Colors.black;
+      canvas.drawRect(Offset.zero & size, backgroundPaint);
+    }
+
     final Offset center = Offset(size.width / 2, size.height / 2);
 
+    // ... (Rest of the sigil painting logic - copied from your working version)
     final pointPaint = Paint()
       ..color = Colors.redAccent.withOpacity(0.8)
       ..style = PaintingStyle.fill;
-
     const pointRadius = 1.75;
     for (final pointOffset in circlePoints) {
       canvas.drawCircle(pointOffset + center, pointRadius, pointPaint);
     }
-
     final pathPaint = Paint()
       ..color = Colors.redAccent
       ..strokeWidth = 1.75
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-
     final glowPaint = Paint()
       ..color = Colors.red.withOpacity(0.5)
       ..strokeWidth = 4.5
@@ -753,7 +688,6 @@ class AnimatedSigilPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
-
     final metrics = fullPath.computeMetrics().toList();
     for (final metric in metrics) {
       if (metric.length == 0) continue;
@@ -763,7 +697,6 @@ class AnimatedSigilPainter extends CustomPainter {
       canvas.drawPath(partialPath.shift(center), glowPaint);
       canvas.drawPath(partialPath.shift(center), pathPaint);
     }
-
     if (circleProgress > 0) {
       const double outerCircleRadius = 105.0;
       const double baseStrokeWidth = 1.5;
@@ -783,11 +716,14 @@ class AnimatedSigilPainter extends CustomPainter {
   bool shouldRepaint(covariant AnimatedSigilPainter oldDelegate) =>
       oldDelegate.progress != progress ||
       oldDelegate.circleProgress != circleProgress ||
-      !listEquals(oldDelegate.circlePoints, circlePoints) ||
-      oldDelegate.fullPath != fullPath;
+      !listEquals(
+          oldDelegate.circlePoints, circlePoints) || // Use your listEquals
+      oldDelegate.fullPath != fullPath ||
+      oldDelegate.drawBackgroundOnExport !=
+          drawBackgroundOnExport; // <<<<<<< ADDED
 }
 
-// --- listEquals Helper (No changes from your original) ---
+// --- listEquals Helper (Copied from your working version - no changes) ---
 bool listEquals<T>(List<T>? a, List<T>? b) {
   if (a == null) return b == null;
   if (b == null || a.length != b.length) return false;
@@ -796,4 +732,10 @@ bool listEquals<T>(List<T>? a, List<T>? b) {
     if (a[i] != b[i]) return false;
   }
   return true;
+}
+
+// Placeholder for openAppSettings (Copied from your working version)
+Future<void> openAppSettings() async {
+  // ignore: avoid_print
+  print("Attempting to open app settings. Implement with a plugin if needed.");
 }
