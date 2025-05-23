@@ -1,5 +1,5 @@
 // lib/screens/sigil_generator_screen.dart
-// Full Flutter Sigil Generator – Retooled with Back to Splash, Audio & Conditional Export Background
+// Full Flutter Sigil Generator – Audio Handled Globally, Correct Back to Splash & Conditional Export Background
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:typed_data'; // For Uint8List
@@ -9,7 +9,6 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:audioplayers/audioplayers.dart'; // <<<<<<< ADDED for music
 
 // Import SplashScreen to navigate back to it
 import 'package:oracle_unbound_app/screens/splash_screen.dart';
@@ -23,9 +22,11 @@ class SigilGeneratorScreen extends StatefulWidget {
   State<SigilGeneratorScreen> createState() => _SigilGeneratorScreenState();
 }
 
-// <<<<<<< ADDED WidgetsBindingObserver for app lifecycle
+// No WidgetsBindingObserver mixin needed here for audio anymore
 class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin {
+  // TickerProvider is still needed for sigil animations
+
   final TextEditingController _controller = TextEditingController();
   late AnimationController _pathAnimationController;
   late Animation<double> _pathAnimation;
@@ -46,16 +47,12 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
 
   final GlobalKey _sigilBoundaryKey = GlobalKey();
   bool _isExporting = false;
-  bool _drawBackgroundForExport = false;
+  bool _drawBackgroundForExport = false; // For conditional background on export
 
-  // --- AUDIO PLAYER ---
-  final AudioPlayer _audioPlayer =
-      AudioPlayer(); // <<<<<<< ADDED audio player instance
-  bool _isMusicPlaying = false; // <<<<<<< ADDED to track music state
+  // All local audio player variables and state (_audioPlayer, _isMusicPlaying) are REMOVED
 
   static const int _pathAnimationDurationMs = 5200;
   static const int _circleAnimationDurationMs = 1200;
-  // ... (other static const durations remain the same)
   static const int _flyingLettersDurationMs = 1600;
   static const int _flyingLettersStaggerMs = 100;
   static const int _pauseAfterFlyingLettersMs = 200;
@@ -67,8 +64,8 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance
-        .addObserver(this); // <<<<<<< ADDED observer for lifecycle
+    // No WidgetsBinding.instance.addObserver(this) for audio
+    // No _playAmbientMusic() call
 
     _pathAnimationController = AnimationController(
       vsync: this,
@@ -92,15 +89,13 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
       CurvedAnimation(
           parent: _circleAnimationController, curve: Curves.easeOutQuint),
     )..addListener(() => setState(() {}));
-
-    _playAmbientMusic(); // <<<<<<< ADDED call to play music
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this); // <<<<<<< REMOVED observer
-    _stopAmbientMusic(); // <<<<<<< ADDED call to stop music
-    _audioPlayer.dispose(); // <<<<<<< DISPOSE audio player
+    // No WidgetsBinding.instance.removeObserver(this) for audio
+    // No _stopAmbientMusic() call
+    // No _audioPlayer.dispose()
 
     _controller.dispose();
     _pathAnimationController.dispose();
@@ -109,68 +104,9 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
     super.dispose();
   }
 
-  // --- APP LIFECYCLE CHANGES FOR MUSIC ---
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // <<<<<<< ADDED LIFECYCLE METHOD
-    super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.detached) {
-      if (_isMusicPlaying) {
-        _audioPlayer.pause();
-      }
-    } else if (state == AppLifecycleState.resumed) {
-      // Only resume if it was playing before and the screen is still active
-      // And we intend for music to be playing on this screen.
-      if (_isMusicPlaying && mounted) {
-        _audioPlayer.resume();
-      }
-    }
-  }
+  // No didChangeAppLifecycleState method (it's now in main.dart's MyApp)
+  // No _playAmbientMusic or _stopAmbientMusic methods
 
-  // --- MUSIC CONTROL METHODS ---
-  Future<void> _playAmbientMusic() async {
-    // <<<<<<< ADDED METHOD
-    try {
-      // Ensure you have 'background.mp3' (or your chosen file) in 'assets/audio/'
-      // and declared in pubspec.yaml
-      await _audioPlayer.setSource(AssetSource('audio/background.mp3'));
-      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-      await _audioPlayer.resume();
-      if (mounted) {
-        setState(() {
-          _isMusicPlaying = true;
-        });
-      }
-    } catch (e) {
-      // ignore: avoid_print
-      print("Error playing music: $e");
-      if (mounted) {
-        setState(() {
-          _isMusicPlaying = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _stopAmbientMusic() async {
-    // <<<<<<< ADDED METHOD
-    try {
-      await _audioPlayer.stop();
-      if (mounted) {
-        setState(() {
-          _isMusicPlaying = false;
-        });
-      }
-    } catch (e) {
-      // ignore: avoid_print
-      print("Error stopping music: $e");
-    }
-  }
-  // --- END MUSIC CONTROL METHODS ---
-
-  // ... (_resetSigilState, _generateSigil, _generateCirclePoints, _generateSigilPath, _exportSigil methods remain IDENTICAL to your last provided block)
   void _resetSigilState() {
     _pathAnimationController.reset();
     _circleAnimationController.reset();
@@ -429,13 +365,11 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
         appBar: AppBar(
           leading: IconButton(
             icon: Icon(Icons.arrow_back_ios_new, color: Colors.redAccent[100]),
-            tooltip: 'Back to Home', // Updated tooltip
+            tooltip: 'Back to Home',
             onPressed: () {
-              // Navigate to SplashScreen and remove all routes above it.
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const SplashScreen()),
-                (Route<dynamic> route) =>
-                    false, // This predicate removes all routes.
+                (Route<dynamic> route) => false,
               );
             },
           ),
@@ -447,7 +381,6 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
           centerTitle: true,
         ),
         body: Stack(
-          // ... (The rest of the body Stack and its children remain IDENTICAL to your last provided block)
           alignment: Alignment.center,
           children: [
             Padding(
@@ -614,7 +547,7 @@ class _SigilGeneratorScreenState extends State<SigilGeneratorScreen>
   }
 }
 
-// --- FlyingLetterWidget (NO CHANGES) ---
+// --- FlyingLetterWidget (No changes from your previous correct version) ---
 class FlyingLetterWidget extends StatefulWidget {
   final String char;
   final Offset start;
@@ -713,7 +646,7 @@ class _FlyingLetterWidgetState extends State<FlyingLetterWidget>
   }
 }
 
-// --- AnimatedSigilPainter (NO CHANGES) ---
+// --- AnimatedSigilPainter (No changes from your previous correct version) ---
 class AnimatedSigilPainter extends CustomPainter {
   final Path fullPath;
   final double progress;
@@ -793,7 +726,7 @@ class AnimatedSigilPainter extends CustomPainter {
       oldDelegate.drawBackgroundOnExport != drawBackgroundOnExport;
 }
 
-// --- listEquals Helper (NO CHANGES) ---
+// --- listEquals Helper (No changes from your previous correct version) ---
 bool listEquals<T>(List<T>? a, List<T>? b) {
   if (a == null) return b == null;
   if (b == null || a.length != b.length) return false;
@@ -804,7 +737,7 @@ bool listEquals<T>(List<T>? a, List<T>? b) {
   return true;
 }
 
-// --- openAppSettings Placeholder (NO CHANGES) ---
+// --- openAppSettings Placeholder (No changes from your previous correct version) ---
 Future<void> openAppSettings() async {
   // ignore: avoid_print
   print("Attempting to open app settings. Implement with a plugin if needed.");

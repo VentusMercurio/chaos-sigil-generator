@@ -1,8 +1,10 @@
 // lib/screens/splash_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // Ensure this is imported for kReleaseMode
 import 'package:oracle_unbound_app/screens/sigil_generator_screen.dart';
-import 'package:oracle_unbound_app/widgets/video_background_scaffold.dart'; // Import VideoBackgroundScaffold
-import 'package:oracle_unbound_app/screens/about_screen.dart'; // <<<<<<< ADD IMPORT FOR ABOUT SCREEN
+import 'package:oracle_unbound_app/widgets/video_background_scaffold.dart';
+import 'package:oracle_unbound_app/screens/about_screen.dart';
+import 'package:oracle_unbound_app/services/audio_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,9 +14,19 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // This print statement is vital for current debugging.
+    if (!kReleaseMode) {
+      print(
+          "SplashScreen: initState CALLED. Attempting to initialize AudioService.");
+    }
+    AudioService.instance.initializeAndPlayMusic();
+  }
+
   void _proceedToApp() {
     Navigator.of(context).pushReplacement(
-      // Use pushReplacement to prevent going back to splash
       MaterialPageRoute(
         builder: (BuildContext context) => const SigilGeneratorScreen(),
       ),
@@ -22,7 +34,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _navigateToAboutScreen() {
-    // <<<<<<< NEW NAVIGATION METHOD
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (BuildContext context) => const AboutScreen(),
@@ -48,16 +59,6 @@ class _SplashScreenState extends State<SplashScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     const SizedBox(height: 20),
-                    // --- ICON REMOVED ---
-                    // Image.asset(
-                    //   'assets/images/icon.png',
-                    //   width: 100,
-                    //   height: 100,
-                    //   errorBuilder: (context, error, stackTrace) {
-                    //     return const FlutterLogo(size: 80);
-                    //   },
-                    // ),
-                    // const SizedBox(height: 20), // Space after icon, also removed or adjusted
                     const Text(
                       'Chaos Sigil Generator',
                       textAlign: TextAlign.center,
@@ -144,10 +145,8 @@ class _SplashScreenState extends State<SplashScreen> {
                       ),
                       child: const Text('Acknowledge & Proceed'),
                     ),
-                    const SizedBox(
-                        height: 20), // <<<<<<< SPACE BEFORE ABOUT BUTTON
+                    const SizedBox(height: 20),
                     TextButton(
-                      // <<<<<<< ADDED ABOUT/FAQ BUTTON
                       onPressed: _navigateToAboutScreen,
                       style: TextButton.styleFrom(
                         foregroundColor: Colors.grey[400],
@@ -159,9 +158,9 @@ class _SplashScreenState extends State<SplashScreen> {
                         style: TextStyle(fontSize: 14),
                       ),
                     ),
-                    const SizedBox(height: 20), // Space before version
+                    const SizedBox(height: 20),
                     Text(
-                      "Version 1.0.1", // Consider updating version number
+                      "Version 1.0.1",
                       style: TextStyle(color: Colors.grey[500], fontSize: 12),
                     ),
                     const SizedBox(height: 20),
